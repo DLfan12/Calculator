@@ -1,0 +1,1250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculator</title>
+  <style>
+    :root{--card-bg:#fff;--muted:#666}
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f7f7f8;color:#111}
+    .app{width:920px;max-width:96vw}
+    header{display:flex;gap:8px;align-items:center;margin-bottom:18px}
+    .nav{display:flex;gap:6px}
+    .nav button{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    .card{background:var(--card-bg);padding:16px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+    label{display:block;margin-top:8px;font-weight:600}
+    input[type=text]{width:100%;padding:8px;font-size:16px;margin-top:6px}
+    select{padding:6px;margin-left:6px}
+    .row{display:flex;gap:8px;align-items:center;margin-top:12px}
+    pre{background:#f0f0f3;padding:12px;border-radius:6px;overflow:auto}
+    .muted{color:var(--muted);font-size:13px}
+    .error{color:#b00020;font-weight:700}
+    .matrix-grid{display:inline-grid;gap:6px}
+    .matrix-grid input{width:64px;padding:6px;text-align:center}
+    .controls{display:flex;gap:8px;margin-top:8px}
+    .hidden{display:none}
+    .title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .steps{white-space:pre-wrap;max-height:260px;overflow:auto}
+
+    @media (max-width: 768px) {
+      .card > div[style*="display:flex"] {
+        flex-direction: column;
+      }
+
+      canvas {
+        width: 100%;
+        height: auto;
+        touch-action: none;
+      }
+
+      input, button {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="title-row">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h1 style="margin:0;font-size:18px">Calculator</h1>
+        <div class="nav">
+          <button id="tab-calc">Simple calculator</button>
+          <button id="tab-converter">Base Converter</button>
+          <button id="tab-matrix">Matrix Solver</button>
+          <button id="tab-system">Equation System</button>
+          <button id="tab-affine">Affine Solver</button>
+          <button id="tab-quadratic">Quadratic Solver</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- BASE CONVERTER CARD -->
+    <div id="converter" class="card">
+      <h2 style="margin-top:0">Base Converter (2–36)</h2>
+      <p class="muted">Enter a number. Letters A–Z are accepted for digits &gt;9.</p>
+
+      <label for="input">Number to convert</label>
+      <input id="input" type="text" placeholder="ex: 101101, 2F, -255, A.F" />
+
+      <div class="row">
+        <label for="from">From</label>
+        <select id="from"></select>
+
+        <label for="to">To</label>
+        <select id="to"></select>
+
+        <button id="swap">Swap</button>
+        <button id="convert">Convert</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <div id="message" class="muted"></div>
+        <pre id="output">Result </pre>
+        <pre id="steps" class="muted steps">Steps </pre>
+        <div style="margin-top:8px">
+          <button id="copy">Copy result</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MATRIX SOLVER CARD -->
+    <div id="matrix" class="card hidden">
+      <h2 style="margin-top:0">Matrix / Linear System Solver </h2>
+      <p class="muted">Solve systems of linear equations. Enter coefficients in the matrix below.</p>
+
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <label>Size: <input id="mat-size" type="number" min="1" max="8" value="3" style="width:64px;margin-left:6px" /></label>
+        <button id="gen-matrix">Generate</button>
+        
+      </div>
+
+      <div id="matrix-area" style="margin-top:12px"></div>
+
+      <div class="controls">
+        <button id="solve-matrix">Solve</button>
+        <button id="clear-matrix">Clear</button>
+        
+      </div>
+
+      <h3>Solution</h3>
+      <pre id="matrix-output">No solution</pre>
+      <h3>Steps</h3>
+      <pre id="matrix-steps" class="steps muted">Steps appear here</pre>
+    </div>
+
+    <div id="system" class="card hidden">
+      <h2 style="margin-top:0">Equation System → Matrix</h2>
+      <p class="muted">
+        Enter one linear equation per line (example:
+        <code>2x + y - z = 8</code>)
+      </p>
+
+      <label for="system-input">Equations</label>
+      <textarea
+        id="system-input"
+        rows="6"
+        style="width:100%;padding:8px;font-family:monospace"
+      ></textarea>
+
+      <div class="controls">
+        <button id="parse-system">Convert to matrix</button>
+      </div>
+
+      <h3>Augmented matrix</h3>
+      <pre id="system-output">No matrix yet</pre>
+    </div>
+
+    <div id="calc" class="card hidden">
+      <h2 style="margin-top:0">Simple calculator</h2>
+      <p class="muted">
+        Use <code>*</code> for multiplication,
+        <code>/</code> for division,
+        <code>^</code> for exponentiation.
+      </p>
+
+      <label for="calc-input">Expression</label>
+      <input
+        id="calc-input"
+        type="text"
+        placeholder="ex: 2 + 3 * 4 - 5^2"
+      />
+
+      <div class="controls">
+        <button id="calc-eval">Solve</button>
+      </div>
+
+      <h3>Result</h3>
+      <pre id="calc-output">—</pre>
+    </div>
+
+    <div id="quadratic" class="card hidden">
+      <h2 style="margin-top:0">Quadratic Equation (Coordinates)</h2>
+
+      <div style="display:flex;gap:16px;align-items:flex-start">
+        
+        <!-- LEFT: controls -->
+        <div style="flex:1">
+          <label>Input method</label>
+          <select id="quad-mode">
+            <option value="coeff">Using a, b, c</option>
+            <option value="points">Using 3 points</option>
+          </select>
+
+          <div id="quad-coeff">
+            <label>a</label>
+            <input id="qa" />
+            <label>b</label>
+            <input id="qb" />
+            <label>c</label>
+            <input id="qc" />
+          </div>
+
+          <div id="quad-points" class="hidden">
+            <p class="muted">Enter three points</p>
+            <div class="row"><input id="x1" placeholder="x₁" /><input id="y1" placeholder="y₁" /></div>
+            <div class="row"><input id="x2" placeholder="x₂" /><input id="y2" placeholder="y₂" /></div>
+            <div class="row"><input id="x3" placeholder="x₃" /><input id="y3" placeholder="y₃" /></div>
+          </div>
+
+          <div class="controls">
+            <button id="solve-quadratic">Solve</button>
+            <button id="reset-quad">Reset graph view</button>
+          </div>
+
+          <h3>Results</h3>
+          <pre id="quad-output">—</pre>
+          <h3>Steps</h3>
+          <pre id="quad-steps" class="steps muted"></pre>
+        </div>
+
+        <!-- RIGHT: graph -->
+        <div style="width:360px">
+          <canvas id="quad-canvas" width="360" height="360"
+            style="border:1px solid #ddd;border-radius:8px;background:#fff"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div id="affine" class="card hidden">
+      <h2 style="margin-top:0">Affine Equation (y = mx + b)</h2>
+
+      <div style="display:flex;gap:16px;align-items:flex-start">
+
+        <!-- LEFT -->
+        <div style="flex:1">
+          <label>Input method</label>
+          <select id="affine-mode">
+            <option value="coeff">Using m and b</option>
+            <option value="points">Using 2 points</option>
+          </select>
+
+          <div id="affine-coeff">
+            <label>m (slope)</label>
+            <input id="am" placeholder="ex: 2" />
+
+            <label>b (y-intercept)</label>
+            <input id="ab" placeholder="ex: -1" />
+          </div>
+
+          <div id="affine-points" class="hidden">
+            <p class="muted">Enter two points</p>
+            <div class="row"><input id="ax1" placeholder="x₁" /><input id="ay1" placeholder="y₁" /></div>
+            <div class="row"><input id="ax2" placeholder="x₂" /><input id="ay2" placeholder="y₂" /></div>
+          </div>
+
+          <div class="controls">
+            <button id="solve-affine">Solve</button>
+            <button id="reset-affine">Reset view</button>
+          </div>
+
+          <h3>Results</h3>
+          <pre id="affine-output">—</pre>
+        </div>
+
+        <!-- RIGHT -->
+        <div style="width:360px">
+          <canvas id="affine-canvas" width="360" height="360"
+            style="border:1px solid #ddd;border-radius:8px;background:#fff"></canvas>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="coord-tooltip"
+      style="
+        position:fixed;
+        pointer-events:none;
+        background:#111;
+        color:#fff;
+        padding:4px 6px;
+        border-radius:4px;
+        font-size:12px;
+        display:none;
+        z-index:1000;
+      ">
+    </div>
+  </div>
+  <script>
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW failed', err));
+    }
+    
+    // --- TAB NAVIGATION ---
+    const tabConverter = document.getElementById('tab-converter');
+    const tabMatrix = document.getElementById('tab-matrix');
+    const tabSystem = document.getElementById('tab-system');
+    const tabCalc = document.getElementById('tab-calc');
+    const tabQuadratic = document.getElementById('tab-quadratic');
+    const quadMode = document.getElementById('quad-mode');
+    const quadCoeff = document.getElementById('quad-coeff');
+    const quadPoints = document.getElementById('quad-points');
+    const viewQuadratic = document.getElementById('quadratic');
+    const viewCalc = document.getElementById('calc');
+    const viewConverter = document.getElementById('converter');
+    const viewMatrix = document.getElementById('matrix');
+    function showTab(tab){
+      viewConverter.classList.add('hidden');
+      viewMatrix.classList.add('hidden');
+      document.getElementById('system').classList.add('hidden');
+      viewCalc.classList.add('hidden');
+      viewQuadratic.classList.add('hidden');
+      viewAffine.classList.add('hidden');
+
+      if(tab === 'converter') viewConverter.classList.remove('hidden');
+      if(tab === 'matrix') viewMatrix.classList.remove('hidden');
+      if(tab === 'system') document.getElementById('system').classList.remove('hidden');
+      if(tab === 'calc') viewCalc.classList.remove('hidden');
+      if(tab === 'quadratic') viewQuadratic.classList.remove('hidden');
+      if (tab === 'affine') viewAffine.classList.remove('hidden');
+    }
+    tabConverter.addEventListener('click', ()=> showTab('converter'));
+    tabMatrix.addEventListener('click', ()=> showTab('matrix'));
+    tabSystem.addEventListener('click', () => showTab('system'));
+    tabCalc.addEventListener('click', () => showTab('calc'));
+    tabQuadratic.addEventListener('click', () => showTab('quadratic'));
+    quadMode.addEventListener('change', () => {
+      const isPoints = quadMode.value === 'points';
+      quadCoeff.classList.toggle('hidden', isPoints);
+      quadPoints.classList.toggle('hidden', !isPoints);
+    });
+    const tabAffine = document.getElementById('tab-affine');
+    const viewAffine = document.getElementById('affine');
+
+    tabAffine.addEventListener('click', () => showTab('affine'));
+
+    const affineMode = document.getElementById('affine-mode');
+    const affineCoeff = document.getElementById('affine-coeff');
+    const affinePoints = document.getElementById('affine-points');
+
+    affineMode.addEventListener('change', () => {
+      const isPoints = affineMode.value === 'points';
+      affineCoeff.classList.toggle('hidden', isPoints);
+      affinePoints.classList.toggle('hidden', !isPoints);
+    });
+
+    // --- BASE CONVERTER ---
+    const from = document.getElementById('from');
+    const to = document.getElementById('to');
+    for(let b=2;b<=36;b++){
+      const o1 = document.createElement('option'); o1.value=b; o1.textContent=b; from.appendChild(o1);
+      const o2 = document.createElement('option'); o2.value=b; o2.textContent=b; to.appendChild(o2);
+    }
+    from.value = 16; to.value = 10;
+
+    const input = document.getElementById('input');
+    const output = document.getElementById('output');
+    const msg = document.getElementById('message');
+
+    function charToValue(c){
+      const code = c.charCodeAt(0);
+      if(code >= 48 && code <= 57) return code - 48;
+      if(code >= 65 && code <= 90) return 10 + code - 65;
+      if(code >= 97 && code <= 122) return 10 + code - 97;
+      return -1;
+    }
+    function valueToChar(v){
+      const digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      return digits[v] || '?';
+    }
+
+    function parseNumber(str, base){
+      str = str.trim();
+      if(str.length === 0) throw new Error('empty input');
+      let negative = false;
+      if(str[0] === '+' || str[0] === '-'){
+        negative = str[0] === '-';
+        str = str.slice(1);
+      }
+      const parts = str.split('.');
+      if(parts.length > 2) throw new Error('multiple decimal points');
+      const intPart = parts[0] || '0';
+      const fracPart = parts[1] || '';
+      let intVal = 0n;
+      const b = BigInt(base);
+      for(const ch of intPart){
+        if(ch === '_') continue;
+        const v = charToValue(ch);
+        if(v < 0 || v >= base) throw new Error('invalid digit "'+ch+'" for base '+base);
+        intVal = intVal * b + BigInt(v);
+      }
+      const fracDigits = [];
+      for(const ch of fracPart){
+        if(ch === '_') continue;
+        const v = charToValue(ch);
+        if(v < 0 || v >= base) throw new Error('invalid digit "'+ch+'" for base '+base);
+        fracDigits.push(v);
+      }
+      return { negative, intVal, fracDigits };
+    }
+
+    function toBaseStringWithFraction(parsed, base, fracPrecision=16){
+      const steps = [];
+      const b = BigInt(base);
+      let { negative, intVal, fracDigits } = parsed;
+
+      // INTEGER PART
+      let intStr = '0';
+      if(intVal !== 0n){
+        let v = intVal;
+        let digits = '';
+        while(v > 0n){
+          const rem = v % b;
+          const next = v / b;
+          steps.push(`${v} ÷ ${base} = ${next} remainder ${rem}`);
+          digits = valueToChar(Number(rem)) + digits;
+          v = next;
+        }
+        steps.push(`Read remainders bottom to top → ${digits}_${base}`);
+        intStr = digits;
+      }
+
+      // FRACTIONAL PART
+      let fracStr = '';
+      if(fracDigits.length > 0){
+        let num = 0n;
+        let den = 1n;
+        const bFrom = BigInt(from.value);
+        for(const d of fracDigits){
+          num = num * bFrom + BigInt(d);
+          den = den * bFrom;
+        }
+        for(let i=0;i<fracPrecision && num !== 0n;i++){
+          const before = num;
+          num = num * b;
+          const digit = num / den;
+          const remainder = num % den;
+          steps.push(`${before}/${den} × ${base} = ${digit} remainder ${remainder}/${den}`);
+          fracStr += valueToChar(Number(digit));
+          num = remainder;
+        }
+        if(num !== 0n){
+          steps.push(`Fraction truncated after ${fracPrecision} digits`);
+        }
+      }
+
+      const result = (negative ? '-' : '') + intStr + (fracStr ? '.' + fracStr : '');
+      return { result, steps };
+    }
+
+    document.getElementById('convert').addEventListener('click', ()=>{
+      msg.textContent = '';
+      try{
+        let s = input.value.trim();
+        let bFrom = parseInt(from.value,10);
+        const bTo = parseInt(to.value,10);
+
+        // PREFIX DETECTION
+        if(s.startsWith('0x') || s.startsWith('0X')){ bFrom = 16; from.value = 16; s = s.slice(2); }
+        else if(s.startsWith('0b') || s.startsWith('0B')){ bFrom = 2; from.value = 2; s = s.slice(2); }
+        else if(s.startsWith('0o') || s.startsWith('0O')){ bFrom = 8; from.value = 8; s = s.slice(2); }
+
+        const parsed = parseNumber(s, bFrom);
+        const conversion = toBaseStringWithFraction(parsed, bTo, 16);
+        output.textContent = conversion.result;
+        const stepsEl = document.getElementById('steps');
+        stepsEl.textContent = conversion.steps.join("\n");
+      }catch(e){
+        output.textContent = 'Error';
+        msg.textContent = e.message;
+        msg.className = 'error';
+      }
+    });
+
+    document.getElementById('swap').addEventListener('click', ()=>{
+      const tmp = from.value; from.value = to.value; to.value = tmp;
+      if(output.textContent && output.textContent !== 'Result will appear here' && output.textContent !== 'Error'){
+        input.value = output.textContent;
+      }
+    });
+
+    document.getElementById('copy').addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(output.textContent); msg.textContent = 'Copied to clipboard'; msg.className='muted'; }
+      catch(e){ msg.textContent = 'Unable to copy: '+e.message; msg.className='error'; }
+    });
+
+    // --- MATRIX SOLVER ---
+    const matArea = document.getElementById('matrix-area');
+    const matSizeInput = document.getElementById('mat-size');
+    const genBtn = document.getElementById('gen-matrix');
+    const solveBtn = document.getElementById('solve-matrix');
+    const clearBtn = document.getElementById('clear-matrix');
+    const fillExBtn = document.getElementById('fill-example');
+    const matOut = document.getElementById('matrix-output');
+    const matStepsEl = document.getElementById('matrix-steps');
+    
+
+    function buildMatrixInputs(n){
+      matArea.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'matrix-grid';
+      grid.style.gridTemplateColumns = `repeat(${n+1}, auto)`;
+      for(let r=0;r<n;r++){
+        for(let c=0;c<n+1;c++){
+          const inp = document.createElement('input'); inp.type='text'; inp.value = '0';
+          inp.dataset.r = r; inp.dataset.c = c; grid.appendChild(inp);
+        }
+      }
+      matArea.appendChild(grid);
+    }
+
+    function readMatrix(n){
+      const inputs = matArea.querySelectorAll('input');
+      const M = Array.from({length:n}, ()=>Array(n+1).fill(0));
+      inputs.forEach(inp=>{
+        const r = parseInt(inp.dataset.r,10); const c = parseInt(inp.dataset.c,10);
+        const v = parseFloat(inp.value) || 0;
+        M[r][c] = v;
+      });
+      return M;
+    }
+
+    function solveQuadraticFromPoints(p) {
+      // Build augmented matrix
+      const M = [
+        [p[0].x**2, p[0].x, 1, p[0].y],
+        [p[1].x**2, p[1].x, 1, p[1].y],
+        [p[2].x**2, p[2].x, 1, p[2].y]
+      ];
+
+      const res = gaussJordan(M);
+      if (!res.solution) throw new Error('Points do not form a valid quadratic');
+
+      const [a, b, c] = res.solution;
+      return { a, b, c };
+    }
+
+    const canvas = document.getElementById('quad-canvas');
+    const ctx = canvas.getContext('2d');
+
+    const tooltip = document.getElementById('coord-tooltip');
+
+    let scaleX = 40;
+    let scaleY = 40;
+    let originX = canvas.width / 2;
+    let originY = canvas.height / 2;
+    let lastQuadratic = null;
+    let hoverX = null;
+
+    function drawParabola(a, b, c, points = []) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      lastQuadratic = { a, b, c, points };
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Axes
+      ctx.strokeStyle = '#aaa';
+      ctx.beginPath();
+      ctx.moveTo(0, originY);
+      ctx.lineTo(w, originY);
+      ctx.moveTo(originX, 0);
+      ctx.lineTo(originX, h);
+      ctx.stroke();
+
+      // Parabola
+      ctx.strokeStyle = '#0077cc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      let first = true;
+      for (let px = 0; px < w; px++) {
+        const x = (px - originX) / scaleX;
+        const y = a*x*x + b*x + c;
+        const py = originY - y * scaleY;
+
+        if (first) {
+          ctx.moveTo(px, py);
+          first = false;
+        } else {
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.stroke();
+
+      // Vertex
+      const xv = -b / (2*a);
+      const yv = a*xv*xv + b*xv + c;
+      ctx.fillStyle = '#d00000';
+      ctx.beginPath();
+      ctx.arc(originX + xv*scaleX, originY - yv*scaleY, 5, 0, Math.PI*2);
+      ctx.fill();
+
+      // Known points
+      ctx.fillStyle = '#000';
+      for (const p of points) {
+        ctx.beginPath();
+        ctx.arc(originX + p.x*scaleX, originY - p.y*scaleY, 4, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      if (hoverX !== null) {
+        const y = a * hoverX * hoverX + b * hoverX + c;
+        const px = originX + hoverX * scaleX;
+        const py = originY - y * scaleY;
+
+        ctx.fillStyle = '#ff7a00';
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const affineCanvas = document.getElementById('affine-canvas');
+    const affineCtx = affineCanvas.getContext('2d');
+    const am = document.getElementById('am');
+    const ab = document.getElementById('ab');
+    const ax1 = document.getElementById('ax1');
+    const ay1 = document.getElementById('ay1');
+    const ax2 = document.getElementById('ax2');
+    const ay2 = document.getElementById('ay2');
+
+    let affineScale = 40;
+    let affineOriginX = affineCanvas.width / 2;
+    let affineOriginY = affineCanvas.height / 2;
+    let lastAffine = null;
+    let affineHoverX = null;
+
+    function drawAffine(m, b, points = []) {
+      affineCtx.clearRect(0, 0, affineCanvas.width, affineCanvas.height);
+      lastAffine = { m, b, points };
+
+      // Axes
+      affineCtx.strokeStyle = '#aaa';
+      affineCtx.beginPath();
+      affineCtx.moveTo(0, affineOriginY);
+      affineCtx.lineTo(affineCanvas.width, affineOriginY);
+      affineCtx.moveTo(affineOriginX, 0);
+      affineCtx.lineTo(affineOriginX, affineCanvas.height);
+      affineCtx.stroke();
+
+      // Line
+      affineCtx.strokeStyle = '#009966';
+      affineCtx.lineWidth = 2;
+      affineCtx.beginPath();
+
+      const xMin = -affineOriginX / affineScale;
+      const xMax = (affineCanvas.width - affineOriginX) / affineScale;
+
+      affineCtx.moveTo(
+        affineOriginX + xMin * affineScale,
+        affineOriginY - (m * xMin + b) * affineScale
+      );
+      affineCtx.lineTo(
+        affineOriginX + xMax * affineScale,
+        affineOriginY - (m * xMax + b) * affineScale
+      );
+      affineCtx.stroke();
+
+      // Known points
+      affineCtx.fillStyle = '#000';
+      for (const p of points) {
+        affineCtx.beginPath();
+        affineCtx.arc(
+          affineOriginX + p.x * affineScale,
+          affineOriginY - p.y * affineScale,
+          4, 0, Math.PI * 2
+        );
+        affineCtx.fill();
+      }
+
+      // Hover dot
+      if (affineHoverX !== null) {
+        const y = m * affineHoverX + b;
+        affineCtx.fillStyle = '#ff7a00';
+        affineCtx.beginPath();
+        affineCtx.arc(
+          affineOriginX + affineHoverX * affineScale,
+          affineOriginY - y * affineScale,
+          4, 0, Math.PI * 2
+        );
+        affineCtx.fill();
+      }
+    }
+
+    function formatMatrix(M){
+      return M.map(row => row.map(v=>Number.isFinite(v)?(+v).toPrecision(6):v).join("\t")).join("\n");
+    }
+
+    // Partial pivoting and step logging
+    function gaussJordan(M, opts={precision:6}){
+      const n = M.length; const steps = [];
+
+      const A = M.map(row=>row.slice());
+      const EPS = 1e-12;
+
+      for(let col=0;col<n;col++){
+        // partial pivot: find row with max abs in this column at or below col
+        let pivotRow = col; let maxAbs = Math.abs(A[col][col]);
+        for(let r=col+1;r<n;r++){ if(Math.abs(A[r][col]) > maxAbs){ maxAbs = Math.abs(A[r][col]); pivotRow = r; } }
+        if(Math.abs(A[pivotRow][col]) < EPS){
+          steps.push(`Column ${col}: pivot too small (≈0). System may be singular or have infinite solutions.`);
+          continue;
+        }
+        if(pivotRow !== col){
+          [A[pivotRow], A[col]] = [A[col], A[pivotRow]];
+          steps.push(`Swap row ${pivotRow} and ${col}`);
+          steps.push(formatMatrix(A));
+        }
+
+        // normalize pivot row
+        const pivot = A[col][col];
+        for(let j=col;j<n+1;j++) A[col][j] = A[col][j] / pivot;
+        steps.push(`Normalize row ${col} by pivot ${pivot}`);
+        steps.push(formatMatrix(A));
+
+        // eliminate other rows
+        for(let r=0;r<n;r++){
+          if(r === col) continue;
+          const factor = A[r][col];
+          if(Math.abs(factor) < EPS) continue;
+          for(let j=col;j<n+1;j++){
+            A[r][j] = A[r][j] - factor * A[col][j];
+          }
+          steps.push(`R${r} = R${r} - (${factor}) * R${col}`);
+          steps.push(formatMatrix(A));
+        }
+      }
+
+      // read solutions and check consistency
+      const sol = new Array(n).fill(0);
+      let inconsistent = false;
+      for(let i=0;i<n;i++){
+
+        let allZero = true;
+        for(let j=0;j<n;j++) if(Math.abs(A[i][j]) > EPS) allZero = false;
+        if(allZero && Math.abs(A[i][n]) > EPS){ inconsistent = true; }
+        sol[i] = +A[i][n];
+      }
+
+      return { solution: inconsistent? null: sol, steps, matrix: A, inconsistent };
+    }
+
+    genBtn.addEventListener('click', ()=>{ const n = Math.max(1,Math.min(8,parseInt(matSizeInput.value)||3)); buildMatrixInputs(n); matOut.textContent = 'No solution yet'; matStepsEl.textContent='Steps will appear here'; });
+    
+    buildMatrixInputs(parseInt(matSizeInput.value)||3);
+
+    clearBtn.addEventListener('click', ()=>{ const inputs = matArea.querySelectorAll('input'); inputs.forEach(i=>i.value='0'); matOut.textContent='Cleared'; matStepsEl.textContent=''; });
+
+    solveBtn.addEventListener('click', ()=>{
+      const n = Math.max(1,Math.min(8,parseInt(matSizeInput.value)||3));
+      const M = readMatrix(n);
+      const res = gaussJordan(M);
+      if(res.inconsistent){ matOut.textContent = 'No solution (inconsistent)'; }
+      else if(res.solution){ matOut.textContent = res.solution.map((v,i)=>`x${i} = ${Number.isFinite(v)?v.toPrecision(8):v}`).join("\n"); }
+      else { matOut.textContent = 'Infinite solutions or singular (see steps)'; }
+      matStepsEl.textContent = res.steps.join("\n");
+    });
+
+    const sysInput = document.getElementById('system-input');
+    const sysOut = document.getElementById('system-output');
+
+    document.getElementById('parse-system').addEventListener('click', () => {
+      try {
+        const lines = sysInput.value
+          .split(/\n+/)
+          .map(l => l.trim())
+          .filter(Boolean);
+
+        if (lines.length < 2) {
+          throw new Error('Enter at least two equations');
+        }
+
+        const variables = new Set();
+        const equations = lines.map(line => {
+          const parts = line.split('=');
+          if (parts.length !== 2) {
+            throw new Error('Each equation must contain exactly one =');
+          }
+
+          const lhs = parts[0];
+          const rhs = parseFloat(parts[1]);
+          if (Number.isNaN(rhs)) {
+            throw new Error('Right-hand side must be a number');
+          }
+
+          const terms = lhs
+            .replace(/-/g, '+-')
+            .split('+')
+            .map(t => t.trim())
+            .filter(Boolean);
+
+          const coeffs = {};
+          for (const term of terms) {
+            const m = term.match(/^([+-]?\d*(?:\.\d+)?)?([a-zA-Z])$/);
+            if (!m) {
+              throw new Error('Invalid term: ' + term);
+            }
+
+            const coef =
+              m[1] === '' || m[1] === undefined
+                ? 1
+                : m[1] === '-'
+                ? -1
+                : parseFloat(m[1]);
+
+            const v = m[2];
+            variables.add(v);
+            coeffs[v] = (coeffs[v] || 0) + coef;
+          }
+
+          return { coeffs, rhs };
+        });
+
+        const vars = Array.from(variables).sort();
+
+        const matrix = equations.map(eq => {
+          const row = vars.map(v => eq.coeffs[v] || 0);
+          row.push(eq.rhs);
+          return row;
+        });
+
+        let output = vars.join('\t') + ' | b\n';
+        output += matrix.map(r => r.join('\t')).join('\n');
+        sysOut.textContent = output;
+
+      } catch (e) {
+        sysOut.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    const calcInput = document.getElementById('calc-input');
+    const calcOut = document.getElementById('calc-output');
+
+    document.getElementById('calc-eval').addEventListener('click', () => {
+      try {
+        let expr = calcInput.value.trim();
+        if(!expr) throw new Error('Empty expression');
+
+        // Replace ^ with JS exponent operator
+        expr = expr.replace(/\^/g, '**');
+
+        // Evaluate safely (no variables, no functions)
+        const result = Function('"use strict"; return (' + expr + ')')();
+
+        if(!Number.isFinite(result)) {
+          throw new Error('Result is not a finite number');
+        }
+
+        calcOut.textContent = result;
+      } catch(e) {
+        calcOut.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    document.getElementById('solve-quadratic').addEventListener('click', () => {
+      const out = document.getElementById('quad-output');
+      const steps = document.getElementById('quad-steps');
+
+      try {
+        let a, b, c;
+        let stepLog = [];
+
+        if (quadMode.value === 'coeff') {
+          a = parseFloat(document.getElementById('qa').value);
+          b = parseFloat(document.getElementById('qb').value);
+          c = parseFloat(document.getElementById('qc').value);
+
+          if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c))
+            throw new Error('a, b, c must be numbers');
+
+        } else {
+          const pts = [
+            { x: +x1.value, y: +y1.value },
+            { x: +x2.value, y: +y2.value },
+            { x: +x3.value, y: +y3.value }
+          ];
+
+          if (pts.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y)))
+            throw new Error('All coordinates must be numbers');
+
+          ({ a, b, c } = solveQuadraticFromPoints(pts));
+          stepLog.push(`Solved from points → a=${a}, b=${b}, c=${c}`);
+        }
+
+        drawParabola(a, b, c, quadMode.value === 'points'
+          ? [
+              { x: +x1.value, y: +y1.value },
+              { x: +x2.value, y: +y2.value },
+              { x: +x3.value, y: +y3.value }
+            ]
+          : []
+        );
+
+        if (a === 0) throw new Error('Not a quadratic');
+
+        const D = b*b - 4*a*c;
+        const xv = -b / (2*a);
+        const yv = a*xv*xv + b*xv + c;
+
+        let result = `Equation:\ny = ${a}x² + ${b}x + ${c}\n\n`;
+
+        stepLog.push(`Δ = ${D}`);
+
+        if (D > 0) {
+          const x1 = (-b + Math.sqrt(D)) / (2*a);
+          const x2 = (-b - Math.sqrt(D)) / (2*a);
+          result += `x-intercepts:\n(${x1}, 0)\n(${x2}, 0)\n`;
+        } else if (D === 0) {
+          const x = -b / (2*a);
+          result += `x-intercept:\n(${x}, 0)\n`;
+        } else {
+          result += `No real x-intercepts\n`;
+        }
+
+        result += `\nVertex:\n(${xv}, ${yv})`;
+        result += `\nY-intercept:\n(0, ${c})`;
+
+        out.textContent = result;
+        steps.textContent = stepLog.join('\n');
+
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+        steps.textContent = '';
+      }
+    });
+
+    document.getElementById('solve-affine').addEventListener('click', () => {
+      const out = document.getElementById('affine-output');
+
+      try {
+        let m, b, points = [];
+
+        if (affineMode.value === 'coeff') {
+          m = parseFloat(am.value);
+          b = parseFloat(ab.value);
+          if (!Number.isFinite(m) || !Number.isFinite(b))
+            throw new Error('m and b must be numbers');
+
+        } else {
+          const x1 = +ax1.value, y1 = +ay1.value;
+          const x2 = +ax2.value, y2 = +ay2.value;
+
+          if (!Number.isFinite(x1) || !Number.isFinite(y1) ||
+              !Number.isFinite(x2) || !Number.isFinite(y2))
+            throw new Error('All coordinates must be numbers');
+
+          if (x1 === x2) throw new Error('Vertical line is not affine');
+
+          m = (y2 - y1) / (x2 - x1);
+          b = y1 - m * x1;
+
+          points = [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+        }
+
+        out.textContent = `y = ${m}x + ${b}`;
+        drawAffine(m, b, points);
+
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    function handleQuadraticPointer(mx, rect) {
+      if (!lastQuadratic) return;
+
+      const { a, b, c } = lastQuadratic;
+
+      hoverX = (mx - originX) / scaleX;
+
+      drawParabola(a, b, c, lastQuadratic.points);
+
+      const y = a * hoverX * hoverX + b * hoverX + c;
+
+      const px = originX + hoverX * scaleX;
+      const py = originY - y * scaleY;
+
+      tooltip.style.display = 'block';
+      tooltip.textContent = `(${hoverX.toFixed(3)}, ${y.toFixed(3)})`;
+      tooltip.style.left = (rect.left + px + 12) + 'px';
+      tooltip.style.top  = (rect.top  + py + 12) + 'px';
+    }
+
+    function handleAffinePointer(mx, rect) {
+      if (!lastAffine) return;
+
+      affineHoverX = (mx - affineOriginX) / affineScale;
+      const y = lastAffine.m * affineHoverX + lastAffine.b;
+
+      drawAffine(lastAffine.m, lastAffine.b, lastAffine.points);
+
+      const px = affineOriginX + affineHoverX * affineScale;
+      const py = affineOriginY - y * affineScale;
+
+      tooltip.style.display = 'block';
+      tooltip.textContent = `(${affineHoverX.toFixed(3)}, ${y.toFixed(3)})`;
+      tooltip.style.left = (rect.left + px + 12) + 'px';
+      tooltip.style.top  = (rect.top  + py + 12) + 'px';
+    }
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+
+      if (!lastQuadratic) return;
+
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      const xBefore = (mx - originX) / scaleX;
+      const yBefore = (originY - my) / scaleY;
+
+      // Apply zoom
+      scaleX *= zoomFactor;
+      scaleY *= zoomFactor;
+
+      scaleX = Math.min(Math.max(scaleX, 10), 300);
+      scaleY = Math.min(Math.max(scaleY, 10), 300);
+
+      originX = mx - xBefore * scaleX;
+      originY = my + yBefore * scaleY;
+
+      const { a, b, c, points } = lastQuadratic;
+      drawParabola(a, b, c, points);
+    }, { passive: false });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      handleQuadraticPointer(e.clientX - rect.left, rect);
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 1) return;
+
+      e.preventDefault();
+
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+
+      handleQuadraticPointer(
+        touch.clientX - rect.left,
+        rect
+      );
+    }, { passive: false });
+
+    canvas.addEventListener('dblclick', () => {
+      scaleX = 40;
+      scaleY = 40;
+      originX = canvas.width / 2;
+      originY = canvas.height / 2;
+
+      if (lastQuadratic) {
+        const { a, b, c, points } = lastQuadratic;
+        drawParabola(a, b, c, points);
+      }
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      hoverX = null;
+      tooltip.style.display = 'none';
+
+      if (lastQuadratic) {
+        const { a, b, c, points } = lastQuadratic;
+        drawParabola(a, b, c, points);
+      }
+    });
+
+    affineCanvas.addEventListener('mousemove', (e) => {
+      const rect = affineCanvas.getBoundingClientRect();
+      handleAffinePointer(e.clientX - rect.left, rect);
+    });
+
+    affineCanvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 1) return;
+
+      e.preventDefault();
+
+      const rect = affineCanvas.getBoundingClientRect();
+      const touch = e.touches[0];
+
+      handleAffinePointer(
+        touch.clientX - rect.left,
+        rect
+      );
+    }, { passive: false });
+
+    affineCanvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (!lastAffine) return;
+
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      const rect = affineCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      const xBefore = (mx - affineOriginX) / affineScale;
+      const yBefore = (affineOriginY - my) / affineScale;
+
+      // Apply zoom
+      affineScale *= zoomFactor;
+      affineScale = Math.min(Math.max(affineScale, 10), 300);
+
+      affineOriginX = mx - xBefore * affineScale;
+      affineOriginY = my + yBefore * affineScale;
+
+      drawAffine(lastAffine.m, lastAffine.b, lastAffine.points);
+    }, { passive: false });
+
+    // --- AFFINE: double-click to reset view ---
+    affineCanvas.addEventListener('dblclick', () => {
+      affineScale = 40;
+      affineOriginX = affineCanvas.width / 2;
+      affineOriginY = affineCanvas.height / 2;
+      if (lastAffine) drawAffine(lastAffine.m, lastAffine.b, lastAffine.points);
+    });
+
+    affineCanvas.addEventListener('mouseleave', () => {
+      affineHoverX = null;
+      tooltip.style.display = 'none';
+
+      if (lastAffine) {
+        drawAffine(lastAffine.m, lastAffine.b, lastAffine.points);
+      }
+    });
+
+    // ---------- TOUCH GESTURE SUPPORT (pinch zoom + two-finger pan) ----------
+    let quadLastTouchDist = null;
+    let quadLastTouchMid = null;
+
+    function distBetween(t1, t2){ return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
+    function midPoint(t1, t2){ return { x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 }; }
+
+    // Quadratic pinch/pan
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        quadLastTouchDist = distBetween(e.touches[0], e.touches[1]);
+        quadLastTouchMid = midPoint(e.touches[0], e.touches[1]);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const d = distBetween(e.touches[0], e.touches[1]);
+        const mid = midPoint(e.touches[0], e.touches[1]);
+
+        // compute zoom factor
+        if (quadLastTouchDist && Math.abs(d - quadLastTouchDist) > 0.5) {
+          const rect = canvas.getBoundingClientRect();
+          // mouse-like point to center zoom at: canvas coords of mid
+          const mx = mid.x - rect.left;
+          const my = mid.y - rect.top;
+
+          const zoomFactor = d / quadLastTouchDist; // >1 = zoom in
+          // convert to math coords before zoom
+          const xBefore = (mx - originX) / scaleX;
+          const yBefore = (originY - my) / scaleY;
+
+          // apply zoom (limit)
+          scaleX *= zoomFactor;
+          scaleY *= zoomFactor;
+          scaleX = Math.min(Math.max(scaleX, 6), 400);
+          scaleY = Math.min(Math.max(scaleY, 6), 400);
+
+          // recenter so mid stays under fingers
+          originX = mx - xBefore * scaleX;
+          originY = my + yBefore * scaleY;
+
+          // redraw
+          if (lastQuadratic) drawParabola(lastQuadratic.a, lastQuadratic.b, lastQuadratic.c, lastQuadratic.points);
+        } else {
+          // two-finger pan: if mid moved, translate origin
+          if (quadLastTouchMid) {
+            const rect = canvas.getBoundingClientRect();
+            const dx = mid.x - quadLastTouchMid.x;
+            const dy = mid.y - quadLastTouchMid.y;
+            originX += dx;
+            originY += dy;
+            if (lastQuadratic) drawParabola(lastQuadratic.a, lastQuadratic.b, lastQuadratic.c, lastQuadratic.points);
+          }
+        }
+
+        quadLastTouchDist = d;
+        quadLastTouchMid = mid;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) {
+        quadLastTouchDist = null;
+        quadLastTouchMid = null;
+      }
+    }, { passive: false });
+
+    // ---------- Affine pinch/pan (same logic) ----------
+    let affLastTouchDist = null;
+    let affLastTouchMid = null;
+
+    affineCanvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        affLastTouchDist = distBetween(e.touches[0], e.touches[1]);
+        affLastTouchMid = midPoint(e.touches[0], e.touches[1]);
+      }
+    }, { passive: false });
+
+    affineCanvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const d = distBetween(e.touches[0], e.touches[1]);
+        const mid = midPoint(e.touches[0], e.touches[1]);
+
+        if (affLastTouchDist && Math.abs(d - affLastTouchDist) > 0.5) {
+          const rect = affineCanvas.getBoundingClientRect();
+          const mx = mid.x - rect.left;
+          const my = mid.y - rect.top;
+
+          const zoomFactor = d / affLastTouchDist;
+          const xBefore = (mx - affineOriginX) / affineScale;
+          const yBefore = (affineOriginY - my) / affineScale;
+
+          affineScale *= zoomFactor;
+          affineScale = Math.min(Math.max(affineScale, 6), 400);
+
+          affineOriginX = mx - xBefore * affineScale;
+          affineOriginY = my + yBefore * affineScale;
+
+          if (lastAffine) drawAffine(lastAffine.m, lastAffine.b, lastAffine.points);
+        } else {
+          if (affLastTouchMid) {
+            const dx = mid.x - affLastTouchMid.x;
+            const dy = mid.y - affLastTouchMid.y;
+            affineOriginX += dx;
+            affineOriginY += dy;
+            if (lastAffine) drawAffine(lastAffine.m, lastAffine.b, lastAffine.points);
+          }
+        }
+
+        affLastTouchDist = d;
+        affLastTouchMid = mid;
+      }
+    }, { passive: false });
+
+    affineCanvas.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) {
+        affLastTouchDist = null;
+        affLastTouchMid = null;
+      }
+    }, { passive: false });
+
+    document.getElementById('reset-quad').addEventListener('click', () => {
+      scaleX = 40; scaleY = 40;
+      originX = canvas.width / 2; originY = canvas.height / 2;
+      if (lastQuadratic) drawParabola(lastQuadratic.a, lastQuadratic.b, lastQuadratic.c, lastQuadratic.points);
+    });
+
+    document.getElementById('reset-affine').addEventListener('click', () => {
+      affineScale = 40;
+      affineOriginX = affineCanvas.width / 2;
+      affineOriginY = affineCanvas.height / 2;
+      if (lastAffine) drawAffine(lastAffine.m, lastAffine.b, lastAffine.points);
+    });
+  </script>
+</body>
+</html

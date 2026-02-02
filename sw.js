@@ -3,7 +3,6 @@ const FILES_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  // list any JS/CSS/images you need cached
 ];
 
 // install
@@ -17,7 +16,6 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(self.clients.claim());
 });
 
-// fetch
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then(resp => resp || fetch(e.request))
